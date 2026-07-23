@@ -1,0 +1,32 @@
+services:
+  overseerr:
+    image: sctx/overseerr:latest
+    container_name: overseerr
+    environment:
+      LOG_LEVEL: info
+      TZ: ${TZ:-Asia/Kolkata}
+    ports:
+      - "5055:5055"
+    volumes:
+      - ./data/overseerr:/app/config
+    restart: unless-stopped
+
+  # Experimental only. Keep this client disabled in Sonarr and Radarr until
+  # the streaming pipeline is tested independently and proven reliable.
+  nzbdav:
+    profiles: ["legacy-nzbdav"]
+    image: ghcr.io/nzbdav-dev/nzbdav:latest
+    container_name: nzbdav
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      TZ: ${TZ:-Asia/Kolkata}
+      WEBDAV_USER: ${NZBDAV_WEBDAV_USER:-disabled-until-configured}
+      WEBDAV_PASSWORD: ${NZBDAV_WEBDAV_PASSWORD:-disabled-until-configured}
+    volumes:
+      - nzbdav_config:/config
+      - ./data/nzbdav-cache:/cache
+
+volumes:
+  nzbdav_config:

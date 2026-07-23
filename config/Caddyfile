@@ -1,0 +1,23 @@
+sonarr.samurai.local:80 {
+    reverse_proxy host.docker.internal:8989
+}
+
+radarr.samurai.local:80 {
+    reverse_proxy host.docker.internal:7878
+}
+
+overseerr.samurai.local:80 {
+    reverse_proxy host.docker.internal:5055
+}
+
+plex.samurai.local:80 {
+    reverse_proxy host.docker.internal:32400
+}
+
+immich.samurai.local:80 {
+    reverse_proxy host.docker.internal:2283
+}
+
+sabnzbd.samurai.local:80 {
+    reverse_proxy host.docker.internal:8080
+}
