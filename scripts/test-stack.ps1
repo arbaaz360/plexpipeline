@@ -4,12 +4,12 @@ param()
 $ErrorActionPreference = 'Continue'
 
 $checks = @(
-    @{ Name = 'Plex'; Port = 32400; Path = '/identity' },
-    @{ Name = 'Sonarr'; Port = 8989; Path = '/ping' },
-    @{ Name = 'Radarr'; Port = 7878; Path = '/ping' },
-    @{ Name = 'SABnzbd'; Port = 8080; Path = '/api?mode=version&output=json' },
-    @{ Name = 'Overseerr'; Port = 5055; Path = '/api/v1/status' },
-    @{ Name = 'Immich'; Port = 2283; Path = '/api/server/ping' }
+    @{ Name = 'Plex'; Hostname = 'plex.samurai.local'; Port = 32400; Path = '/identity' },
+    @{ Name = 'Sonarr'; Hostname = 'sonarr.samurai.local'; Port = 8989; Path = '/ping' },
+    @{ Name = 'Radarr'; Hostname = 'radarr.samurai.local'; Port = 7878; Path = '/ping' },
+    @{ Name = 'SABnzbd'; Hostname = 'sabnzbd.samurai.local'; Port = 8080; Path = '/api?mode=version&output=json' },
+    @{ Name = 'Overseerr'; Hostname = 'overseerr.samurai.local'; Port = 5055; Path = '/api/v1/status' },
+    @{ Name = 'Immich'; Hostname = 'immich.samurai.local'; Port = 2283; Path = '/api/server/ping' }
 )
 
 $results = foreach ($check in $checks) {
@@ -35,6 +35,29 @@ $results = foreach ($check in $checks) {
     }
 }
 
+foreach ($check in $checks) {
+    $url = "https://$($check.Hostname)$($check.Path)"
+    try {
+        $watch = [Diagnostics.Stopwatch]::StartNew()
+        $response = Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 -Uri $url
+        $watch.Stop()
+        $results += [pscustomobject]@{
+            Kind = 'HTTPS'
+            Target = $check.Name
+            Status = $response.StatusCode
+            Milliseconds = $watch.ElapsedMilliseconds
+        }
+    }
+    catch {
+        $results += [pscustomobject]@{
+            Kind = 'HTTPS'
+            Target = $check.Name
+            Status = 'DOWN'
+            Milliseconds = '-'
+        }
+    }
+}
+
 $folders = @(
     'X:\Plex\MOVIES',
     'X:\Plex\Documentary Movies',
@@ -52,3 +75,10 @@ foreach ($folder in $folders) {
 }
 
 $results | Format-Table Kind, Target, Status, Milliseconds -AutoSize
+
+$failed = @($results | Where-Object {
+    $_.Status -in @('DOWN', 'MISSING')
+})
+if ($failed.Count -gt 0) {
+    throw "$($failed.Count) stack validation check(s) failed."
+}

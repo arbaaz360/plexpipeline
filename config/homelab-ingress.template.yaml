@@ -35,8 +35,18 @@ metadata:
   namespace: default
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - sonarr.samurai.local
+        - radarr.samurai.local
+        - overseerr.samurai.local
+        - plex.samurai.local
+        - immich.samurai.local
+        - sabnzbd.samurai.local
+      secretName: samurai-local-tls
   rules:
     - host: sonarr.samurai.local
       http:

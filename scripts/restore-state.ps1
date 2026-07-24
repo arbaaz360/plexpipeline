@@ -33,7 +33,7 @@ if (-not $PSCmdlet.ShouldProcess(
 
 try {
     Stop-Service Radarr -Force -ErrorAction SilentlyContinue
-    Stop-Process -Name 'Sonarr.Console', 'SABnzbd-console', 'Plex Media Server' `
+    Stop-Process -Name 'Sonarr', 'Sonarr.Console', 'SABnzbd-console', 'Plex Media Server' `
         -Force -ErrorAction SilentlyContinue
     docker stop overseerr 2>$null | Out-Null
 
@@ -63,6 +63,12 @@ try {
         New-Item -ItemType Directory -Path $vaultRoot -Force | Out-Null
         Copy-Item "$work\Obsidian\Connections" $vaultRoot -Recurse -Force
     }
+
+    if (Test-Path "$work\LocalPKI") {
+        $localPkiRoot = Join-Path $env:LOCALAPPDATA 'InstantPlex\pki'
+        New-Item -ItemType Directory -Path $localPkiRoot -Force | Out-Null
+        Copy-Item "$work\LocalPKI\*" $localPkiRoot -Recurse -Force
+    }
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
@@ -79,6 +85,15 @@ Start-Process 'C:\Program Files\Plex\Plex Media Server\Plex Media Server.exe' `
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
 docker compose --project-directory $repoRoot up -d overseerr
+
+$startupFolder = [Environment]::GetFolderPath('Startup')
+$sonarrShortcutPath = Join-Path $startupFolder 'Sonarr.lnk'
+$shell = New-Object -ComObject WScript.Shell
+$sonarrShortcut = $shell.CreateShortcut($sonarrShortcutPath)
+$sonarrShortcut.TargetPath = 'C:\ProgramData\Sonarr\bin\Sonarr.exe'
+$sonarrShortcut.Arguments = '-nobrowser'
+$sonarrShortcut.WorkingDirectory = 'C:\ProgramData\Sonarr\bin'
+$sonarrShortcut.Save()
 
 Write-Host 'State restored and core applications started. Run test-stack.ps1.' `
     -ForegroundColor Green

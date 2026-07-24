@@ -1,0 +1,10 @@
+{
+  "name": "samurai-mdns-responder",
+  "private": true,
+  "version": "1.0.0",
+  "description": "LAN-only mDNS A-record responder for *.samurai.local services",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "multicast-dns": "7.2.5"
+  }
+}

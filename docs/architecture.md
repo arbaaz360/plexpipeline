@@ -28,7 +28,7 @@ Sonarr jobs remain visible in SABnzbd history.
 | Runtime | Services |
 |---|---|
 | Windows | Plex, Sonarr, Radarr, SABnzbd |
-| Docker Compose | Overseerr, Immich, supporting application projects |
+| Docker Compose | Overseerr; Immich is a related, separately managed project |
 | Docker Desktop Kubernetes | ingress-nginx and friendly host routing |
 | Tailscale | remote access to the Samurai host |
 
@@ -36,11 +36,17 @@ Sonarr jobs remain visible in SABnzbd history.
 
 | Service | URL |
 |---|---|
-| Plex | `http://plex.samurai.local` |
-| Overseerr | `http://overseerr.samurai.local` |
-| Sonarr | `http://sonarr.samurai.local` |
-| Radarr | `http://radarr.samurai.local` |
-| SABnzbd | `http://sabnzbd.samurai.local` |
-| Immich | `http://immich.samurai.local` |
+| Plex | `https://plex.samurai.local` |
+| Overseerr | `https://overseerr.samurai.local` |
+| Sonarr | `https://sonarr.samurai.local` |
+| Radarr | `https://radarr.samurai.local` |
+| SABnzbd | `https://sabnzbd.samurai.local` |
+| Immich | `https://immich.samurai.local` |
 
-The ingress template derives the current LAN IPv4 address when applied.
+The ingress template derives the current LAN IPv4 address when applied. HTTPS
+uses the `samurai-local-tls` Kubernetes secret and redirects HTTP requests to
+HTTPS. Client devices must trust the InstantPlex local root CA.
+
+The gateway owns all six friendly routes, including Immich's route. Immich's
+Compose configuration and private database recovery are maintained in
+<https://github.com/arbaaz360/immich>.

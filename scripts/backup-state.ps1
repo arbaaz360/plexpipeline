@@ -13,6 +13,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stage = Join-Path $env:TEMP "samurai-state-$stamp"
 $archive = Join-Path $DestinationRoot "samurai-state-$stamp.zip"
+$partialArchive = Join-Path $DestinationRoot "samurai-state-$stamp.partial.zip"
 $repoRoot = Split-Path $PSScriptRoot -Parent
 
 New-Item -ItemType Directory -Path $stage, $DestinationRoot -Force | Out-Null
@@ -20,7 +21,7 @@ $log = Join-Path $DestinationRoot "last-backup-$stamp.log"
 Start-Transcript -LiteralPath $log -Force | Out-Null
 
 $radarrWasRunning = (Get-Service Radarr -ErrorAction SilentlyContinue).Status -eq 'Running'
-$sonarrWasRunning = [bool](Get-Process 'Sonarr.Console' -ErrorAction SilentlyContinue)
+$sonarrWasRunning = [bool](Get-Process 'Sonarr', 'Sonarr.Console' -ErrorAction SilentlyContinue)
 $sabWasRunning = [bool](Get-Process 'SABnzbd-console' -ErrorAction SilentlyContinue)
 $plexWasRunning = [bool](Get-Process 'Plex Media Server' -ErrorAction SilentlyContinue)
 $overseerrWasRunning = [bool](docker ps --filter 'name=^/overseerr$' -q)
@@ -28,16 +29,31 @@ $overseerrWasRunning = [bool](docker ps --filter 'name=^/overseerr$' -q)
 function Copy-StateItem {
     param([string]$Source, [string]$Destination)
 
-    if (Test-Path -LiteralPath $Source) {
-        New-Item -ItemType Directory -Path (Split-Path $Destination -Parent) -Force |
+    if (-not (Test-Path -LiteralPath $Source)) {
+        return
+    }
+
+    $sourceItem = Get-Item -LiteralPath $Source -Force
+    if ($sourceItem.PSIsContainer) {
+        New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+        Get-ChildItem -LiteralPath $Source -Force |
+            Copy-Item -Destination $Destination -Recurse -Force
+    }
+    else {
+        New-Item `
+            -ItemType Directory `
+            -Path (Split-Path $Destination -Parent) `
+            -Force |
             Out-Null
-        Copy-Item -LiteralPath $Source -Destination $Destination -Recurse -Force
+        Copy-Item -LiteralPath $Source -Destination $Destination -Force
     }
 }
 
 try {
     if ($radarrWasRunning) { Stop-Service Radarr -Force }
-    if ($sonarrWasRunning) { Stop-Process -Name 'Sonarr.Console' -Force }
+    if ($sonarrWasRunning) {
+        Stop-Process -Name 'Sonarr', 'Sonarr.Console' -Force -ErrorAction SilentlyContinue
+    }
     if ($sabWasRunning) { Stop-Process -Name 'SABnzbd-console' -Force }
     if ($plexWasRunning) { Stop-Process -Name 'Plex Media Server' -Force }
     if ($overseerrWasRunning) { docker stop overseerr | Out-Null }
@@ -71,12 +87,17 @@ try {
             Select-Object -ExpandProperty Source -First 1
     }
     if ($overseerrSource) {
-        Copy-StateItem $overseerrSource "$stage\Overseerr"
+        Copy-StateItem (Join-Path $overseerrSource 'db') "$stage\Overseerr\db"
+        Copy-StateItem `
+            (Join-Path $overseerrSource 'settings.json') `
+            "$stage\Overseerr\settings.json"
     }
 
     $vaultConnections = Join-Path $env:USERPROFILE `
         'Documents\MyGeneralVault\Personal\Connections'
     Copy-StateItem $vaultConnections "$stage\Obsidian\Connections"
+
+    Copy-StateItem "$env:LOCALAPPDATA\InstantPlex\pki" "$stage\LocalPKI"
 
     Copy-StateItem "$repoRoot\docker-compose.yml" `
         "$stage\Infrastructure\docker-compose.yml"
@@ -92,10 +113,27 @@ try {
     }
     netsh advfirewall export "$stage\firewall.wfw" | Out-Null
 
-    & tar.exe -a -c -f $archive -C $stage .
+    $requiredStageFiles = @(
+        "$stage\Radarr\radarr.db",
+        "$stage\Sonarr\sonarr.db",
+        "$stage\SABnzbd\sabnzbd.ini",
+        "$stage\LocalPKI\rootCA-key.pem",
+        "$stage\LocalPKI\rootCA.pem",
+        "$stage\Obsidian\Connections\How Samurai Local Services Work.md",
+        "$stage\Obsidian\Connections\One-Click C Drive Recovery.md"
+    )
+    $missingStageFiles = @($requiredStageFiles | Where-Object {
+        -not (Test-Path -LiteralPath $_ -PathType Leaf)
+    })
+    if ($missingStageFiles.Count -gt 0) {
+        throw "Critical backup files are missing: $($missingStageFiles -join ', ')"
+    }
+
+    & tar.exe -a -c -f $partialArchive -C $stage .
     if ($LASTEXITCODE -ne 0) {
         throw "tar.exe failed with exit code $LASTEXITCODE"
     }
+    Move-Item -LiteralPath $partialArchive -Destination $archive
 }
 finally {
     if ($radarrWasRunning) { Start-Service Radarr }
@@ -116,8 +154,14 @@ finally {
     if (Test-Path -LiteralPath $stage) {
         Remove-Item -LiteralPath $stage -Recurse -Force
     }
+    if (Test-Path -LiteralPath $partialArchive) {
+        Remove-Item -LiteralPath $partialArchive -Force
+    }
     Stop-Transcript -ErrorAction SilentlyContinue | Out-Null
 }
 
 Write-Host "Private backup created: $archive" -ForegroundColor Green
-Write-Warning 'This archive contains credentials. Never commit or share it.'
+Write-Warning (
+    'This archive contains credentials and the private local CA key. ' +
+    'Never commit or share it.'
+)

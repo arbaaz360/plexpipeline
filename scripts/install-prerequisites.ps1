@@ -17,7 +17,8 @@ $packages = @(
     'Docker.DockerDesktop',
     'Tailscale.Tailscale',
     'Obsidian.Obsidian',
-    'OpenJS.NodeJS.LTS'
+    'OpenJS.NodeJS.LTS',
+    'FiloSottile.mkcert'
 )
 
 foreach ($id in $packages) {
@@ -38,4 +39,4 @@ foreach ($folder in $mediaFolders) {
     New-Item -ItemType Directory -Path $folder -Force | Out-Null
 }
 
-Write-Host 'Prerequisites installed. Start Docker Desktop before restoring.' -ForegroundColor Green
+Write-Host 'Prerequisites installed.' -ForegroundColor Green
